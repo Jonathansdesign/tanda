@@ -29,7 +29,8 @@ probability to choose it.
 | Save a member's PayPal wallet (approve once) | `vault_test.py` | Works for one sandbox account |
 | Charge a saved wallet with no one present | `vault_charge_test.py` | Works for one sandbox account |
 | Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with one real sandbox member |
-| AI agent (calls the statistics and PayPal as tools, human approves) | | Not built, LLM not chosen yet |
+| Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Built and tested; works with any model |
+| AI agent (an LLM that uses the tools and explains the plan) | | Not built, LLM not chosen yet |
 | Web app and hosted demo (Render) | | Not built |
 | Simulation study (validates the model against known truth) | `tanda_study.py` | Built and run |
 
@@ -66,8 +67,18 @@ probability to choose it.
 
 Bernoulli and binomial trials, Bayes' theorem, the law of total probability, PMFs
 and CDFs (tail probability), convolution of PMFs, exhaustive search over all N!
-orders, and simulation (interval coverage, paired comparisons with
-standard errors).
+orders, and simulation (repeating a random experiment many times to check the
+model: interval coverage, and paired comparisons with standard errors).
+
+## Agent safety design
+
+An AI model will coordinate the circle, but it cannot move money. `tanda_tools.py`
+gives it four tools: look at the circle's status, estimate one member, score the
+payout orders, and propose the next round. A proposal moves nothing. Running a round
+is a separate function (`approve_and_run`) that a human triggers and that is not in
+the list of tools the AI can call; a request for it by name is refused. All numbers
+come from the Python statistics, not from the model, and the model is never shown
+the simulated members' hidden true probabilities.
 
 ## Results so far (one simulated circle, seed 42)
 
@@ -210,17 +221,18 @@ Never commit `.env`. It is listed in `.gitignore`.
 
 ## Roadmap
 
-- Round runner: charge saved wallets, record successes and failures, update
+- [] Round runner: charge saved wallets, record successes and failures, update
       the statistics, rescore the order, pay out the pot
-- Simulation study: loss versus random and best-possible orders over many
+- [] Simulation study: loss versus random and best-possible orders over many
       circles, plus interval coverage
-- Replace the grid with a continuous (Beta) posterior to remove the 0.95 ceiling
-- Sensitivity check: compare against a model where every payment updates beliefs
-- Simple web app
-- AI agent: calls the statistics and PayPal client as tools, with human
-      approval before money moves
-- Deploy a hosted demo on Render
-- Demo video and final write-up
+- [ ] Replace the grid with a continuous (Beta) posterior to remove the 0.95 ceiling
+- [ ] Sensitivity check: compare against a model where every payment updates beliefs
+- [ ] Simple web app
+- [] Agent tool layer: read-only tools plus propose-only, human-approved execution
+- [ ] AI agent: an LLM that calls those tools, explains the plan, and drafts
+      messages (choose a model and connect it)
+- [ ] Deploy a hosted demo on Render
+- [ ] Demo video and final write-up
 
 ## Notes
 

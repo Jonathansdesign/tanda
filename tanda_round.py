@@ -55,8 +55,55 @@ def collect(member, contribution, received, live, client, rng, mock_decline):
     return rng.random() < p, "simulated"
 
 
+def plan_round(members, paid_out, rnd, contribution, bad_threshold=3):
+    """Step 1 (PLAN): score the payout orders still possible this round.
+    Members already paid are fixed; the rest are shuffled and compared."""
+    return analyze_orders({m.name: m.history for m in members},
+                          contribution, bad_threshold,
+                          rounds_done=rnd, fixed_prefix=paid_out)
+
+
+def execute_round(members, paid_out, rnd, contribution, winner, live, client, rng,
+                  mock_decline=False, say=print):
+    """Steps 3 to 5 for ONE round: collect, learn, pay out.
+
+    This moves money (in live mode), so it must only run after a human approved.
+    It changes `members` (histories) and `paid_out` in place and returns a record.
+    `say` is where the progress lines go (print by default).
+    """
+    n = len(members)
+    collected = 0.0
+    missed_this_round = []
+    for m in members:
+        received = m.name in paid_out
+        ok, how = collect(m, contribution, received, live, client, rng, mock_decline)
+        say(f"  {m.name:6} {'paid  ' if ok else 'MISSED'}  ({how})")
+        if ok:
+            collected += contribution
+        if received:                       # only post-payout behavior is informative
+            m.history.append(1 if ok else 0)
+            if not ok:
+                missed_this_round.append(m.name)
+
+    payout_note = "no PayPal account (simulated member)"
+    if live and winner.email and collected > 0:
+        try:
+            res = client.send_payout(winner.email, collected, note=f"Tanda round {rnd + 1}")
+            payout_note = f"sent, batch {res['payout_batch_id']} ({res['batch_status']})"
+        except PayPalError as e:
+            payout_note = f"FAILED ({e})"
+    elif not live:
+        payout_note = "dry run, nothing sent"
+    say(f"Pot: ${collected:.2f} of ${contribution * n:.2f}. Payout to {winner.name}: {payout_note}")
+
+    paid_out.append(winner.name)
+    return {"round": rnd + 1, "winner": winner.name, "pot": collected,
+            "missed_by_paid_members": missed_this_round, "payout": payout_note}
+
+
 def run_circle(members, contribution=5.0, live=False, auto_approve=False,
                rng=None, client=None, bad_threshold=3, mock_decline=False):
+    """Run every round in a loop, asking a human to approve each one."""
     rng = rng or random.Random()
     n = len(members)
     by_name = {m.name: m for m in members}
@@ -67,11 +114,7 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
 
     for rnd in range(n):
         print(f"\n=== Round {rnd + 1} of {n} ===")
-
-        # 1. PLAN
-        plan = analyze_orders({m.name: m.history for m in members},
-                              contribution, bad_threshold,
-                              rounds_done=rnd, fixed_prefix=paid_out)
+        plan = plan_round(members, paid_out, rnd, contribution, bad_threshold)
         best = plan["best"]
         first_plan = first_plan or plan
         winner = by_name[best["order"][rnd]]
@@ -80,7 +123,6 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
               f"chance of {bad_threshold}+ missed payments {best['p_bad']:.1%}")
         print(f"This round's winner: {winner.name}")
 
-        # 2. APPROVE
         n_real = sum(1 for m in members if m.vault_id) if live else 0
         what = (f"Charge {n_real} real sandbox wallet(s) ${contribution:.2f} each"
                 if n_real else "Run this round (simulated, no PayPal calls)")
@@ -88,36 +130,10 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
             print("Stopped: not approved. No further money moved.")
             break
 
-        # 3 and 4. COLLECT and LEARN
-        collected = 0.0
-        missed_this_round = []
-        for m in members:
-            received = m.name in paid_out
-            ok, how = collect(m, contribution, received, live, client, rng, mock_decline)
-            print(f"  {m.name:6} {'paid  ' if ok else 'MISSED'}  ({how})")
-            if ok:
-                collected += contribution
-            if received:                       # only post-payout behavior is informative
-                m.history.append(1 if ok else 0)
-                if not ok:
-                    realized_missed += 1
-                    missed_this_round.append(m.name)
-
-        # 5. PAY OUT
-        payout_note = "no PayPal account (simulated member)"
-        if live and winner.email and collected > 0:
-            try:
-                res = client.send_payout(winner.email, collected, note=f"Tanda round {rnd + 1}")
-                payout_note = f"sent, batch {res['payout_batch_id']} ({res['batch_status']})"
-            except PayPalError as e:
-                payout_note = f"FAILED ({e})"
-        elif not live:
-            payout_note = "dry run, nothing sent"
-        print(f"Pot: ${collected:.2f} of ${contribution * n:.2f}. Payout to {winner.name}: {payout_note}")
-
-        paid_out.append(winner.name)
-        ledger.append({"round": rnd + 1, "winner": winner.name, "pot": collected,
-                       "missed_by_paid_members": missed_this_round, "payout": payout_note})
+        record = execute_round(members, paid_out, rnd, contribution, winner,
+                               live, client, rng, mock_decline)
+        realized_missed += len(record["missed_by_paid_members"])
+        ledger.append(record)
 
     return {"ledger": ledger, "paid_out": paid_out, "realized_missed": realized_missed,
             "realized_loss": realized_missed * contribution, "first_plan": first_plan}
