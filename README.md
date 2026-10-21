@@ -31,7 +31,8 @@ probability to choose it.
 | Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with one real sandbox member |
 | Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Built and tested; works with any model |
 | AI agent (an LLM that uses the tools and explains the plan) | | Not built, LLM not chosen yet |
-| Web app and hosted demo (Render) | | Not built |
+| Web page (Streamlit): status, safest order, propose then human approves | `app.py`, `tanda_view.py` | Built; runs locally, dry-run flow verified |
+| Hosted demo (Render) | | Not built |
 | Simulation study (validates the model against known truth) | `tanda_study.py` | Built and run |
 
 ## How it works
@@ -205,6 +206,7 @@ Findings:
    PAYPAL_CLIENT_SECRET=
    PAYPAL_TEST_RECEIVER=   # a sandbox Personal account email
    TEST_VAULT_ID=          # printed by vault_test.py
+   ENABLE_LIVE=            # set to 1 to allow live PayPal calls from the web page
    ```
 3. Statistics (no PayPal needed): `python tanda_stats.py` and `python tanda_loss.py`
 4. PayPal sandbox: `python create_order.py`, `python create_payout.py`,
@@ -216,6 +218,9 @@ Findings:
    are set). Use a small `--contribution` for live runs.
 6. Validation study: `python tanda_study.py` (about 15 seconds on my machine;
    `--quick` for a rougher, faster version).
+7. Web page: `pip install -r requirements.txt`, then
+   `python -m streamlit run app.py`. It starts as a dry run (no PayPal calls).
+   Click Propose next round, then approve it as the human.
 
 Never commit `.env`. It is listed in `.gitignore`.
 
@@ -227,7 +232,7 @@ Never commit `.env`. It is listed in `.gitignore`.
       circles, plus interval coverage
 - [ ] Replace the grid with a continuous (Beta) posterior to remove the 0.95 ceiling
 - [ ] Sensitivity check: compare against a model where every payment updates beliefs
-- [ ] Simple web app
+- [] Simple web app (Streamlit)
 - [] Agent tool layer: read-only tools plus propose-only, human-approved execution
 - [ ] AI agent: an LLM that calls those tools, explains the plan, and drafts
       messages (choose a model and connect it)

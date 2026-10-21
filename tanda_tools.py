@@ -170,6 +170,20 @@ class TandaSession:
         return record
 
 
+def new_demo_session(live=False, contribution=5.0, seed=42):
+    """Start a fresh demo circle (six simulated members; Ana is real if configured).
+
+    live=False: a dry run, no PayPal calls. live=True: real sandbox calls.
+    """
+    members = demo_members(seed)
+    client = None
+    if live:
+        from paypal_client import PayPalClient   # only needed (and only loaded) in live mode
+        client = PayPalClient()
+    return TandaSession(members, contribution=contribution, live=live, client=client,
+                        rng=random.Random(seed + 1))
+
+
 # ----------------------------------------------------------------------
 # What the AI is allowed to call. Anything not in this table is refused.
 # ----------------------------------------------------------------------
