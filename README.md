@@ -9,6 +9,19 @@ Built for the PayPal AI Hackathon (Oct 2026). Everything uses PayPal's **sandbox
 no real money moves, and all member payment histories used for the statistics are
 **simulated**.
 
+
+Live demo
+
+https://tanda-wma5.onrender.com/
+
+Hosted on Render's free plan, so the first visit after a quiet period can take about a minute to wake up. The hosted page runs as a dry run: it makes no PayPal calls (see Limitations). The PayPal sandbox flow is documented under "Results so far" below and shown in the demo video.
+
+To try it:
+
+Read the member table and the "Safest payout order" box.
+Click Propose next round, then I approve: run this round. Only that button runs a round.
+Repeat, or ask the AI coordinator a question (for example "Who needs attention?"). It explains the numbers and can propose a round, but it cannot approve one.
+
 ## The idea in plain English
 
 In a rotating savings circle (a tanda, susu, or hui), 6 people each put in $100 a
