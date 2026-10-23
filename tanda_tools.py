@@ -225,7 +225,10 @@ A human approves every payment.
 5. If a member already paid out has needs_attention=true, point it out and suggest a \
 gentle next step for the organizer (such as a friendly reminder). You may draft the \
 message text, but you cannot send it.
-6. Keep answers short and end with what the human needs to decide."""
+6. Keep answers short and end with what the human needs to decide.
+7. A round only runs when a person clicks the "I approve: run this round" button on the \
+page. Typing "yes" in the chat does nothing, so never imply that it does. When you have \
+proposed a round, tell the person to use that button."""
 
 
 def call_tool(session, name, arguments=None):
