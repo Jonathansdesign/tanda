@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from paypal_client import PayPalClient, PayPalError
 from tanda_loss import analyze_orders
+from tanda_members import load_wallets
 from tanda_stats import estimate_member, simulate_history
 
 
@@ -140,14 +141,21 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
 
 
 def demo_members(seed):
-    """Six simulated members. If TEST_VAULT_ID and PAYPAL_TEST_RECEIVER are set in
-    .env, Ana becomes a REAL sandbox member (saved wallet plus payout account)."""
+    """Six members with simulated payment histories. A member becomes REAL (saved
+    wallet plus payout account) if they appear in members.local.json, or, for Ana
+    only, if TEST_VAULT_ID and PAYPAL_TEST_RECEIVER are set in .env."""
     rng = random.Random(seed)
     true_p = {"Ana": 0.95, "Ben": 0.90, "Carla": 0.80,
               "Dev": 0.70, "Elena": 0.60, "Femi": 0.45}
     members = [Member(nm, simulate_history(p, 8, rng), true_p=p) for nm, p in true_p.items()]
+    # Wallets saved by vault_test.py (members.local.json) make those members real.
+    wallets = load_wallets()
+    for m in members:
+        if m.name in wallets:
+            m.vault_id, m.email = wallets[m.name]["vault_id"], wallets[m.name]["email"]
+    # Older setup: one wallet in .env makes Ana real (only if she isn't in the file).
     vault, email = os.getenv("TEST_VAULT_ID"), os.getenv("PAYPAL_TEST_RECEIVER")
-    if vault and email:
+    if vault and email and members[0].vault_id is None:
         members[0].vault_id, members[0].email = vault, email
     return members
 
