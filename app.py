@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import streamlit as st
 
+from tanda_agent import Coordinator
 from tanda_tools import call_tool, new_demo_session
 from tanda_view import (HOW_TO_READ, ledger_rows, md, order_text, proposal_lines,
                         risk_sentences, status_rows)
@@ -42,6 +43,7 @@ def start_new_circle():
     except Exception as e:                      # for example, missing PayPal keys
         st.session_state["flash"] = f"Could not start that circle: {e}"
     st.session_state["last_round"] = None
+    st.session_state["agent_result"] = None
 
 
 def do_propose():
@@ -60,10 +62,18 @@ def do_approve():
     result = session.approve_and_run(session.pending["proposal_id"])
     st.session_state["flash"] = result.get("error")
     st.session_state["last_round"] = None if "error" in result else result
+    st.session_state["agent_result"] = None      # an old answer would now be out of date
 
 
 def do_cancel():
     st.session_state["session"].pending = None
+
+
+def ask_coordinator(question=None):
+    """Send a question to the AI coordinator (preset buttons pass their own question)."""
+    text = question or st.session_state.get("agent_question", "")
+    st.session_state["agent_result"] = st.session_state["coordinator"].ask(
+        st.session_state["session"], text)
 
 
 # ------------------------------------------------------------------ sidebar
@@ -82,6 +92,8 @@ st.sidebar.caption("Settings apply when you start a new circle.")
 
 if "session" not in st.session_state:
     start_new_circle()
+if "coordinator" not in st.session_state:       # one per visitor; keeps its own question count
+    st.session_state["coordinator"] = Coordinator()
 
 # --------------------------------------------------------------------- page
 st.title("Tanda")
@@ -154,9 +166,34 @@ if session.ledger:
     st.dataframe(pd.DataFrame(ledger_rows(session.ledger)).set_index("Round"))
 
 st.subheader("AI coordinator")
-st.info("Not connected yet. When it is, a language model will explain this page in plain "
-        "language using only the numbers above. It will be able to propose a round but "
-        "never approve one.")
+coordinator = st.session_state["coordinator"]
+if not coordinator.available:
+    st.info("The AI coordinator is switched off because no GEMINI_API_KEY is set. "
+            "Everything else on this page works without it.")
+else:
+    st.caption(f"Powered by Google Gemini ({coordinator.model}). It can only read the "
+               "results above through a short list of safe tools and propose a round. "
+               "It cannot approve a round or move money. On Google's free tier, questions "
+               "and answers may be used to improve Google's products, so this demo uses "
+               "only simulated data.")
+    st.text_input("Ask about this circle", key="agent_question",
+                  placeholder="For example: Who needs attention, and why?")
+    st.button("Ask the coordinator", on_click=ask_coordinator)
+    p1, p2, p3 = st.columns(3)
+    p1.button("Explain this page", on_click=ask_coordinator,
+              args=("Explain where this circle stands in plain language.",))
+    p2.button("Who needs attention?", on_click=ask_coordinator,
+              args=("Which members need attention, and why?",))
+    p3.button("What next?", on_click=ask_coordinator,
+              args=("What should the organizer decide next?",))
+    answer = st.session_state.get("agent_result")
+    if answer:
+        if answer["error"]:
+            st.error(answer["error"])
+        else:
+            st.markdown(md(answer["answer"]))
+            st.caption("Tools it used to answer: " + (", ".join(answer["tools_used"]) or "none"))
+    st.caption(f"{coordinator.questions_left} questions left in this session.")
 
 with st.expander("How to read these numbers"):
     st.markdown(HOW_TO_READ)
