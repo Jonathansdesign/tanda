@@ -26,9 +26,9 @@ probability to choose it.
 | PayPal client (token reuse, errors, orders, payouts, vault) | `paypal_client.py` | Built, tested against the sandbox |
 | Create a sandbox order | `create_order.py` | Works |
 | Send a sandbox payout | `create_payout.py` | Works (payout arrives in the buyer account) |
-| Save a member's PayPal wallet (approve once) | `vault_test.py` | Works for one sandbox account |
-| Charge a saved wallet with no one present | `vault_charge_test.py` | Works for one sandbox account |
-| Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with one real sandbox member |
+| Save a member's PayPal wallet (approve once) | `vault_test.py`, `tanda_members.py` | Works; all six members have saved wallets |
+| Charge a saved wallet with no one present | `vault_charge_test.py` | Works |
+| Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with six real sandbox members |
 | Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Built and tested; works with any model |
 | AI agent (an LLM that uses the tools and explains the plan) | | Not built, LLM not chosen yet |
 | Web page (Streamlit): status, safest order, propose then human approves | `app.py`, `tanda_view.py` | Built; runs locally, dry-run flow verified |
@@ -101,9 +101,10 @@ circle, not a contradiction: the estimate is an average and single circles vary.
 A member who missed payments after being paid (Femi) saw his estimate fall from
 0.80 to 0.62 (his true simulated value is 0.45).
 
-Live sandbox check (round 1): one real member's saved wallet was charged $5.00
-through PayPal, five members were simulated, and a $30.00 payout was sent to the
-winner (batch status PENDING at the time).
+Live sandbox check (round 1): the circle ran with six saved sandbox wallets. All six
+members were charged $5.00 through PayPal, the pot was $30.00, and a payout was sent
+to the winner (batch status PENDING at the time). I stopped after round 1; rounds
+2 to 6 have not been run live.
 
 ## Validation study (`python tanda_study.py`, seed 2026)
 
@@ -193,8 +194,11 @@ Findings:
   beliefs) is a planned sensitivity check.
 - **Live runs are lightly tested.** Round 1 of a live run is verified; the
   `--mock-decline` option (asking the sandbox to simulate a declined charge) is untested.
-- **One real member so far.** Only one sandbox Personal account has a saved wallet.
-  The other members are simulated until more accounts are set up.
+- **Real accounts always pay.** Each member has a real sandbox account with a saved
+  wallet, but the sandbox always approves the charge, so real members never miss a
+  payment on their own. Their payment histories (the track record the statistics
+  use) are still simulated, and a missed payment can only be shown with simulated
+  members or the untested `--mock-decline` option.
 
 ## Run it
 
@@ -209,9 +213,11 @@ Findings:
    ENABLE_LIVE=            # set to 1 to allow live PayPal calls from the web page
    ```
 3. Statistics (no PayPal needed): `python tanda_stats.py` and `python tanda_loss.py`
-4. PayPal sandbox: `python create_order.py`, `python create_payout.py`,
-   `python vault_test.py` (approve in a private window as a sandbox Personal
-   account), then `python vault_charge_test.py`.
+4. PayPal sandbox: `python create_order.py`, `python create_payout.py`, then save
+   each member's wallet once with `python vault_test.py NAME EMAIL` (approve in a
+   private window while logged in as that exact sandbox Personal account). Wallets
+   are saved to `members.local.json`, which is git-ignored. `python
+   vault_charge_test.py` charges one saved wallet.
 5. Whole circle: `python tanda_round.py` (dry run, no PayPal calls; add `--yes` to
    skip the approval prompts), then `python tanda_round.py --live` (real sandbox
    calls; the member Ana becomes real if `TEST_VAULT_ID` and `PAYPAL_TEST_RECEIVER`
@@ -226,14 +232,14 @@ Never commit `.env`. It is listed in `.gitignore`.
 
 ## Roadmap
 
-- [] Round runner: charge saved wallets, record successes and failures, update
+- [x] Round runner: charge saved wallets, record successes and failures, update
       the statistics, rescore the order, pay out the pot
-- [] Simulation study: loss versus random and best-possible orders over many
+- [x] Simulation study: loss versus random and best-possible orders over many
       circles, plus interval coverage
 - [ ] Replace the grid with a continuous (Beta) posterior to remove the 0.95 ceiling
 - [ ] Sensitivity check: compare against a model where every payment updates beliefs
-- [] Simple web app (Streamlit)
-- [] Agent tool layer: read-only tools plus propose-only, human-approved execution
+- [x] Simple web app (Streamlit)
+- [x] Agent tool layer: read-only tools plus propose-only, human-approved execution
 - [ ] AI agent: an LLM that calls those tools, explains the plan, and drafts
       messages (choose a model and connect it)
 - [ ] Deploy a hosted demo on Render
