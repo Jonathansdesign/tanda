@@ -37,7 +37,7 @@ def coverage(true_p, n_months, trials, rng, level=0.90):
 
 def study_a(trials, rng):
     print("STUDY A: do the 90% intervals cover the true value?")
-    print(f"({trials} simulated members per cell; the grid runs from 0.05 to 0.95)\n")
+    print(f"({trials} simulated members per cell; the grid runs from 0.005 to 0.995)\n")
     months = [4, 8, 16, 32]
     print("true p  | " + " | ".join(f"{m:>2} months" for m in months))
     print("--------+-" + "-+-".join("---------" for _ in months))

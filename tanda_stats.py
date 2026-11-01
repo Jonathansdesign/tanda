@@ -6,8 +6,12 @@ probability, and a CDF. Everything is plain Python (no installs).
 import random
 from math import comb
 
-# Candidate values for a member's hidden on-time probability: 0.05, 0.10, ... 0.95
-P_GRID = [k / 20 for k in range(1, 20)]
+# Candidate values for a member's hidden on-time probability: 0.005, 0.010, ... 0.995.
+# (199 values, 0.005 apart). More candidates means a closer match to the true,
+# continuous answer; an earlier version used only 19 values and could not
+# represent a member whose true rate is above 0.95.
+GRID_STEPS = 200
+P_GRID = [k / GRID_STEPS for k in range(1, GRID_STEPS)]
 UNIFORM_PRIOR = [1 / len(P_GRID)] * len(P_GRID)
 
 
