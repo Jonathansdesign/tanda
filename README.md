@@ -354,22 +354,29 @@ Findings:
    `python -m streamlit run app.py`. It starts as a dry run (no PayPal calls).
    Click Propose next round, then approve it as the human.
 
-Never commit `.env`. It is listed in `.gitignore`.
 
-## Roadmap
 
-- [x] Round runner: charge saved wallets, record successes and failures, update
-      the statistics, rescore the order, pay out the pot
-- [x] Simulation study: loss versus random and best-possible orders over many
-      circles, plus interval coverage
-- [x] Finer probability grid (199 values) to remove the 0.95 ceiling
-- [ ] Exact continuous (Beta) posterior, once covered in class
-- [ ] Sensitivity check: compare against a model where every payment updates beliefs
-- [x] Simple web app (Streamlit)
-- [x] Agent tool layer: read-only tools plus propose-only, human-approved execution
-- [x] AI coordinator: Gemini calls those tools and explains the circle in plain language
-- [x] Deploy a hosted demo on Render (dry run only)
-- [ ] Demo video and final write-up
+# Roadmap
+
+Done in this submission
+
+ - Statistics: Bayesian reliability estimates and risk scoring of all payout orders
+ - Validation study on simulated circles (interval coverage, loss versus baselines)
+ - PayPal sandbox: saved wallets, charging them with nobody present, payouts
+ - Round runner with a human approval step
+ - Agent tool layer (read-only and propose-only tools) and a Gemini AI coordinator
+ - Streamlit page, hosted on Render (dry run only)
+ - Finer probability grid (199 values) to remove the 0.95 ceiling
+
+Still to do before submitting
+
+ - Demo video (the link goes at the top of this README once it is uploaded)
+
+Future work (not part of submission)
+
+- Exact continuous (Beta) posterior, once covered in class, to check the grid against the exact answer
+- Sensitivity check: compare against a model where every payment updates beliefs
+- Try the tool with real circle organizers (with their consent) and real payment histories
 
 ## Notes
 
