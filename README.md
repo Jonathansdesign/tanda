@@ -136,16 +136,15 @@ through PayPal's sandbox. All calls go through one small client (`paypal_client.
 | Pay the round's winner | Payouts API | `POST /v1/payments/payouts`, `GET /v1/payments/payouts/{id}` | Verified: the recipient received the money |
 | Simulate a declined charge | `PayPal-Mock-Response` test header (sandbox only) | on order creation | Written but **not tested** |
 
-**Evidence from sandbox runs** (October 22, 2026; test money only):
+**Evidence from the November 5, 2026 rehearsal** (test money only):
 
 - Six completed contributions of 5.00 USD each appear in the Business activity.
-- The saved-wallet receipt shown below has transaction ID `195576195X540760B`,
-  billing agreement `B-5KW02379SL281252F`, 5.00 USD gross, a 0.66 USD fee and 4.34 USD net.
-- The winner's screenshot confirms 30.00 USD received, with note "Tanda round 1"
-  and recipient transaction ID `8GF45973MY936960D`.
-- Older chat notes contain other order, batch and transaction IDs. They are not
-  assumed to be the same transactions as these screenshots, and are omitted here
-  to avoid an unverified mapping.
+- The terminal shows payout batch `G2U9A7H3QHFGL` returning `PENDING`, then
+  `SUCCESS` after resuming the same circle without recreating contributions.
+- Ana's matching receipt confirms 30.00 USD received, with note "Tanda round 1"
+  and recipient transaction ID `4PC2308575449973A`.
+- An additional saved-wallet receipt from **October 22** is shown separately below
+  to demonstrate billing-agreement authorization. It is not part of the November 5 run.
 
 **Design choices around the money**
 
@@ -203,28 +202,14 @@ transaction `4PC2308575449973A`.
 
 ![November 5 matching winner receipt](docs/05-winner-receipt-Nov05.png)
 
-#### Earlier evidence — October 22
+#### Earlier sandbox test — October 22
 
-The images below document an earlier run, separate from the November 5 rehearsal.
+**Saved-wallet authorization evidence only:** this earlier receipt shows a completed
+5.00 USD sandbox contribution linked to billing agreement `B-5KW02379SL281252F`.
+Transaction `195576195X540760B` has a 0.66 USD fee and 4.34 USD net. This receipt
+documents a separate test, not the November 5 rehearsal shown above.
 
-
-All transactions below use sandbox test money.
-
-**Six contributions collected:** six completed payments of
-5.00 USD each, totaling 30.00 USD gross before fees.
-
-![Six completed sandbox contributions](docs/01-six-contributions.png)
-
-**Winner paid:** the recipient received 30.00 USD with the
-note “Tanda round 1.”
-
-![Winner's sandbox payout receipt](docs/02-winner-payout.png)
-
-**Saved-wallet contribution:** a completed 5.00 USD payment
-linked to a billing agreement. The receipt shows a 0.66 USD
-fee and 4.34 USD net.
-
-![Sandbox payment linked to a billing agreement](docs/03-saved-wallet-charge.png)
+![Earlier sandbox test October 22 saved-wallet payment linked to a billing agreement](docs/03-saved-wallet-charge.png)
 
 
 ## Agent safety design
