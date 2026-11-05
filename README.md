@@ -169,6 +169,27 @@ need extra PayPal approval, which I have not checked.
 Gemini API for the coordinator; Render for hosting; Streamlit for the page; Python with
 `requests`.
 
+### PayPal sandbox screenshots
+
+All transactions below use sandbox test money.
+
+**Six contributions collected:** six completed payments of
+5.00 USD each, totaling 30.00 USD gross before fees.
+
+![Six completed sandbox contributions](docs/01-six-contributions.png)
+
+**Winner paid:** the recipient received 30.00 USD with the
+note “Tanda round 1.”
+
+![Winner's sandbox payout receipt](docs/02-winner-payout.png)
+
+**Saved-wallet contribution:** a completed 5.00 USD payment
+linked to a billing agreement. The receipt shows a 0.66 USD
+fee and 4.34 USD net.
+
+![Sandbox payment linked to a billing agreement](docs/03-saved-wallet-charge.png)
+
+
 ## Agent safety design
 
 An AI model will coordinate the circle, but it cannot move money. `tanda_tools.py`
