@@ -221,4 +221,7 @@ members.local.json
 # Streamlit
 .streamlit/secrets.toml
 
+# Private sandbox operation journal; keep locally for recovery, never publish.
+.tanda-local/
+
 .env

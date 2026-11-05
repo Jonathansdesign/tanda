@@ -39,17 +39,9 @@ def approve(message, auto):
 
 
 def collect(member, contribution, received, live, client, rng, mock_decline):
-    """Collect one member's contribution. Returns (paid_ok, how)."""
-    if live and member.vault_id:
-        try:
-            client.charge_vaulted(
-                member.vault_id, contribution,
-                reference=f"tanda-{member.name}",
-                mock_error="INSTRUMENT_DECLINED" if (mock_decline and received) else None,
-            )
-            return True, "PayPal"
-        except PayPalError as e:
-            return False, f"PayPal refused ({e})"
+    """Simulate one contribution. Live collections must use the durable journal."""
+    if live:
+        raise PayPalError("Use the live circle journal for sandbox collections.")
     # Simulated member. Assumption from the model: someone who has NOT yet received
     # the pot keeps paying; someone who already did pays with probability true_p.
     p = member.true_p if received else 1.0
@@ -65,13 +57,17 @@ def plan_round(members, paid_out, rnd, contribution, bad_threshold=3):
 
 
 def execute_round(members, paid_out, rnd, contribution, winner, live, client, rng,
-                  mock_decline=False, say=print):
+                  mock_decline=False, say=print, live_journal=None):
     """Steps 3 to 5 for ONE round: collect, learn, pay out.
 
     This moves money (in live mode), so it must only run after a human approved.
     It changes `members` (histories) and `paid_out` in place and returns a record.
     `say` is where the progress lines go (print by default).
     """
+    if live:
+        if live_journal is None:
+            raise PayPalError("Live sandbox execution requires a persistent circle journal.")
+        return live_journal.execute(members, paid_out, rnd, winner, mock_decline, say)
     n = len(members)
     collected = 0.0
     missed_this_round = []
@@ -86,15 +82,7 @@ def execute_round(members, paid_out, rnd, contribution, winner, live, client, rn
             if not ok:
                 missed_this_round.append(m.name)
 
-    payout_note = "no PayPal account (simulated member)"
-    if live and winner.email and collected > 0:
-        try:
-            res = client.send_payout(winner.email, collected, note=f"Tanda round {rnd + 1}")
-            payout_note = f"sent, batch {res['payout_batch_id']} ({res['batch_status']})"
-        except PayPalError as e:
-            payout_note = f"FAILED ({e})"
-    elif not live:
-        payout_note = "dry run, nothing sent"
+    payout_note = "dry run, nothing sent"
     say(f"Pot: ${collected:.2f} of ${contribution * n:.2f}. Payout to {winner.name}: {payout_note}")
 
     paid_out.append(winner.name)
@@ -103,7 +91,8 @@ def execute_round(members, paid_out, rnd, contribution, winner, live, client, rn
 
 
 def run_circle(members, contribution=5.0, live=False, auto_approve=False,
-               rng=None, client=None, bad_threshold=3, mock_decline=False):
+               rng=None, client=None, bad_threshold=3, mock_decline=False,
+               circle_id=None, journal_dir=None):
     """Run every round in a loop, asking a human to approve each one."""
     rng = rng or random.Random()
     n = len(members)
@@ -112,8 +101,16 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
     ledger = []                    # one record per round
     realized_missed = 0            # missed payments by members who had already been paid
     first_plan = None
+    journal = None
+    if live:
+        if auto_approve:
+            raise PayPalError("Live sandbox rounds require human approval; auto-approval is disabled.")
+        from tanda_payments import LiveCircle
+        journal = LiveCircle(members, contribution, circle_id, client, journal_dir)
+        paid_out, ledger = journal.restore()
+        realized_missed = sum(len(r["missed_by_paid_members"]) for r in ledger)
 
-    for rnd in range(n):
+    for rnd in range(len(paid_out), n):
         print(f"\n=== Round {rnd + 1} of {n} ===")
         plan = plan_round(members, paid_out, rnd, contribution, bad_threshold)
         best = plan["best"]
@@ -131,8 +128,13 @@ def run_circle(members, contribution=5.0, live=False, auto_approve=False,
             print("Stopped: not approved. No further money moved.")
             break
 
-        record = execute_round(members, paid_out, rnd, contribution, winner,
-                               live, client, rng, mock_decline)
+        try:
+            record = execute_round(members, paid_out, rnd, contribution, winner,
+                                   live, client, rng, mock_decline, live_journal=journal)
+        except PayPalError as exc:
+            print(f"Round unresolved: {exc}")
+            print("Stopped. Resume with the SAME --circle-id and original settings.")
+            break
         realized_missed += len(record["missed_by_paid_members"])
         ledger.append(record)
 
@@ -166,9 +168,14 @@ if __name__ == "__main__":
     ap.add_argument("--yes", action="store_true", help="auto-approve every round")
     ap.add_argument("--contribution", type=float, default=5.0)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--circle-id", help="required in live mode; reuse it to resume this circle")
     ap.add_argument("--mock-decline", action="store_true",
                     help="ask PayPal to simulate a declined charge for the real member after payout")
     args = ap.parse_args()
+    if args.live and not args.circle_id:
+        ap.error("--live requires --circle-id (reuse the same ID after interruption)")
+    if args.live and args.yes:
+        ap.error("--yes is for dry runs only; live sandbox rounds need human approval")
 
     members = demo_members(args.seed)
     client = PayPalClient() if args.live else None
@@ -177,7 +184,7 @@ if __name__ == "__main__":
 
     result = run_circle(members, args.contribution, live=args.live, auto_approve=args.yes,
                         rng=random.Random(args.seed + 1), client=client,
-                        mock_decline=args.mock_decline)
+                        mock_decline=args.mock_decline, circle_id=args.circle_id)
 
     print("\n=== Summary ===")
     print("Payout order actually used: " + " -> ".join(result["paid_out"]))

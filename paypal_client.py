@@ -19,6 +19,11 @@ BASE = "https://api-m.sandbox.paypal.com"  # sandbox only: no real money
 class PayPalError(Exception):
     """Raised when PayPal returns an error. Includes the debug_id PayPal asks for in support tickets."""
 
+    def __init__(self, message, *, declined=False, rejected=False):
+        super().__init__(message)
+        self.declined = declined
+        self.rejected = rejected
+
 
 class PayPalClient:
     def __init__(self, client_id=None, client_secret=None):
@@ -33,13 +38,20 @@ class PayPalClient:
     def _get_token(self):
         if self._token and time.time() < self._expires_at:
             return self._token
-        resp = requests.post(
-            f"{BASE}/v1/oauth2/token",
-            auth=(self.client_id, self.client_secret),
-            data={"grant_type": "client_credentials"},
-            timeout=30,
-        )
-        self._raise_if_error(resp)
+        try:
+            resp = requests.post(
+                f"{BASE}/v1/oauth2/token",
+                auth=(self.client_id, self.client_secret),
+                data={"grant_type": "client_credentials"},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise PayPalError("Could not authenticate with PayPal. No payment request was sent.",
+                              rejected=True) from exc
+        try:
+            self._raise_if_error(resp)
+        except PayPalError as exc:
+            raise PayPalError(str(exc), rejected=True) from exc
         data = resp.json()
         self._token = data["access_token"]
         self._expires_at = time.time() + int(data.get("expires_in", 3000)) - 60
@@ -53,10 +65,15 @@ class PayPalClient:
                 body = resp.json()
             except ValueError:
                 body = {"message": resp.text}
+            codes = {d.get("issue") for d in body.get("details", [])}
+            declined = resp.status_code in (400, 422) and bool(
+                codes & {"INSTRUMENT_DECLINED", "PAYER_CANNOT_PAY", "INSUFFICIENT_FUNDS"})
             raise PayPalError(
                 f"HTTP {resp.status_code} {body.get('name', body.get('error', ''))}: "
                 f"{body.get('message', body.get('error_description', ''))} "
-                f"(debug_id={body.get('debug_id')})"
+                f"(debug_id={body.get('debug_id')})",
+                declined=declined,
+                rejected=resp.status_code in (400, 401, 403, 404, 422),
             )
 
     def _request(self, method, path, json=None, extra_headers=None):
@@ -66,7 +83,11 @@ class PayPalClient:
         }
         if extra_headers:
             headers.update(extra_headers)
-        resp = requests.request(method, f"{BASE}{path}", headers=headers, json=json, timeout=30)
+        try:
+            resp = requests.request(method, f"{BASE}{path}", headers=headers, json=json, timeout=30)
+        except requests.RequestException as exc:
+            raise PayPalError("PayPal connection failed; the payment outcome may be unknown. "
+                              "Check the existing transaction before retrying.") from exc
         self._raise_if_error(resp)
         return resp.json()
 
@@ -111,9 +132,22 @@ class PayPalClient:
         )
         return {"id": order["id"], "status": order["status"], "approve_url": approve}
 
-    def capture_order(self, order_id):
+    def capture_order(self, order_id, request_id=None):
         """Capture an order after the buyer has approved it."""
-        return self._request("POST", f"/v2/checkout/orders/{order_id}/capture")
+        return self._request("POST", f"/v2/checkout/orders/{order_id}/capture",
+                             extra_headers={"PayPal-Request-Id": request_id or str(uuid.uuid4())})
+
+    def create_vault_order(self, vault_id, amount, *, reference, request_id, mock_error=None):
+        """Create only. The round journal saves this order ID before capture."""
+        headers = {"PayPal-Request-Id": request_id}
+        if mock_error:
+            headers["PayPal-Mock-Response"] = json.dumps({"mock_application_codes": mock_error})
+        return self._request("POST", "/v2/checkout/orders", json={
+            "intent": "CAPTURE",
+            "purchase_units": [{"reference_id": reference,
+                                "amount": {"currency_code": "USD", "value": f"{amount:.2f}"}}],
+            "payment_source": {"paypal": {"vault_id": vault_id}},
+        }, extra_headers=headers)
 
     def charge_vaulted(self, vault_id, amount, currency="USD", reference=None, mock_error=None):
         """Charge a saved PayPal wallet with no buyer present (the member approved once).
@@ -175,7 +209,10 @@ class PayPalClient:
     def get_payout(self, payout_batch_id):
         """Check a payout's status (it can start as PENDING)."""
         data = self._request("GET", f"/v1/payments/payouts/{payout_batch_id}")
-        return {"batch_status": data["batch_header"]["batch_status"], "items": data.get("items", [])}
+        header = data["batch_header"]
+        return {"batch_status": header["batch_status"], "items": data.get("items", []),
+                "payout_batch_id": header.get("payout_batch_id"),
+                "sender_batch_id": header.get("sender_batch_header", {}).get("sender_batch_id")}
 
 
 def extract_vault(order_json):

@@ -17,11 +17,11 @@ no real money moves, and all member payment histories used for the statistics ar
 Hosted on Render's free plan, so the first visit after a quiet period can take about a
 minute to wake up. The hosted page runs as a **dry run**: it makes no PayPal calls (see
 Limitations). The PayPal sandbox flow is documented under "Results so far" below and
-shown in the demo video.
+illustrated by the sandbox screenshots below. A recorded walkthrough will be linked here once uploaded.
 
 To try it:
 
-1. Read the member table and the "Safest payout order" box.
+1. Read the member table and the "Lowest estimated loss under this model" box.
 2. Click **Propose next round**, then **I approve: run this round**. Only that button
    runs a round.
 3. Repeat, or ask the **AI coordinator** a question (for example "Who needs attention?").
@@ -37,41 +37,26 @@ probability to choose it.
 
 ## Who it is for and why it matters
 
-**The practice.** Rotating savings circles are found in many communities. They go by
-names such as [tandas and cundinas in Mexican communities and susus in the Caribbean](https://blog.massmutual.com/post/money-pools),
-and researchers have profiled them among
-[Nepali, Cambodian, Bangladeshi, Ethiopian, Eritrean, Kenyan, Mexican, Caribbean and Central American immigrants in the US](https://microfinancegateway.org/paper/2019/04/how-achieve-american-dream-immigrants-income).
-They may appeal to people who
-[cannot get the Social Security number banks ask for](https://blogs.und.edu/und-today/?p=32388).
+**The practice.** Friends and family pool money and take turns receiving it in
+many communities. Related traditions include tandas, susus, cundinas and paluwagan.
+[Mission Asset Fund describes this shared practice](https://www.missionassetfund.org/programs/)
+and [how tandas helped inspire its Lending Circles program](https://www.missionassetfund.org/about/).
+The traditions and organizers already exist; this prototype explores one supporting tool.
 
-**What already exists.** Software and programs for circles already exist, so Tanda is not
-the first. San Francisco's Mission Asset Fund
-[formalizes circles, collects the payments, and reports them to credit bureaus](https://www.philanthropy.com/news/formal-lending-circles-help-immigrants-build-credit-and-improve-their-lives/),
-and a [consumer-finance article](https://www.experian.com/blogs/ask-experian/what-is-lending-circle)
-names Esusu as another platform that does so. Their focus is building credit. Mission
-Asset Fund has been [quoted reporting a 99% repayment rate](https://www.badcredit.org/news/maf-helps-underserved-financial-consumers-gain-access-and-build-credit/).
-By contrast, informal circles run on trust with
-[no contract or outside oversight](https://joingerald.com/learn/debt--credit/lending-circle-guide)
-(a consumer-finance guide, so a weaker source).
+**Who this prototype is for.** A small-circle organizer who has payment records and
+wants to understand estimated payment risk and uncertainty before discussing payout order.
+Tanda estimates reliability, compares orders under a stated model, and explains the
+results through a Gemini coordinator. The organizer retains approval.
 
-**What Tanda adds.** A narrower question for a circle organizer: given each member's
-payment history, which payout order carries the least risk, and how sure are we? Tanda
-estimates each member's reliability with an honest uncertainty range, compares every
-possible order, and explains the result in plain language. None of the sources I read
-describe a tool that does this, though I cannot rule out that one exists.
+**What is demonstrated.** A simulation study, a working dry-run web app, and sandbox
+contributions and payouts. These demonstrate implementation and model behavior;
+they do not establish improved outcomes for real communities.
 
-**Honest limits of the impact case.**
-
-- Where circles are formal and screened, reported default rates are very low, so Tanda's
-  value is probably greatest for informal circles whose organizers cannot screen members.
-- Everything here is a prototype tested on simulated circles and PayPal's sandbox. I have
-  not tested it with real organizers or real payment histories.
-- The statistical model rests on stated assumptions (see Model assumptions), and
-  real members may not behave that way.
-
-**What would come next.** Show the tool to circle organizers (with their consent) and
-check whether the assumptions and the explanations match how circles really work, then
-test it on real payment histories handled with their permission and privacy.
+**What needs testing.** Organizers may prioritize urgent needs, fairness, and existing
+agreements over the lowest estimated loss. The model currently does not represent
+those priorities. Its assumption that missed payments arise after payout also needs
+checking against real practice. I have not tested Tanda with real organizers or real
+payment histories. The next step is voluntary feedback on the assumptions and explanations.
 
 ## Status
 
@@ -84,8 +69,8 @@ test it on real payment histories handled with their permission and privacy.
 | Send a sandbox payout | `create_payout.py` | Works (payout arrives in the buyer account) |
 | Save a member's PayPal wallet (approve once) | `vault_test.py`, `tanda_members.py` | Works; all six members have saved wallets |
 | Charge a saved wallet with no one present | `vault_charge_test.py` | Works |
-| Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with six real sandbox members |
-| Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Built and tested; works with any model |
+| Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with six sandbox accounts |
+| Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Model-independent tool layer; integrated with Gemini |
 | AI coordinator (Gemini reads the circle through the tools and explains it) | `tanda_agent.py` | Built; answered a question with a real Gemini key |
 | Web page (Streamlit): status, safest order, propose then human approves | `app.py`, `tanda_view.py` | Built; runs locally, dry-run flow verified |
 | Hosted demo (Render, free plan, dry run) | | Deployed: https://tanda-wma5.onrender.com/ |
@@ -102,11 +87,9 @@ test it on real payment histories handled with their permission and privacy.
    dollar loss and the chance of a bad outcome (3 or more missed payments).
 3. **Move money** (`paypal_client.py`). Contributions are charged to each member's
    saved PayPal wallet, and the round's pot is sent to the winner with the Payouts
-   API. A refused charge raises an error that becomes a 0 in that member's history.
+   API. Only a confirmed payment decline can become a 0 in a post-payout member's history; technical or uncertain outcomes stop the round without changing reliability.
 4. **Run the circle** (`tanda_round.py`). Each round: plan, ask a human to approve,
-   collect contributions, record who missed, send the pot. Members without a saved
-   wallet are simulated (clearly labeled in the output), so a demo can mix real
-   sandbox members with simulated ones.
+   collect contributions, record who missed, send the pot. Dry runs simulate all payments. Live sandbox mode requires a saved wallet and payout email for every member; simulated contributions cannot fund a PayPal payout.
 
 ### Model assumptions
 
@@ -140,30 +123,43 @@ through PayPal's sandbox. All calls go through one small client (`paypal_client.
 | Pay the round's winner | Payouts API | `POST /v1/payments/payouts`, `GET /v1/payments/payouts/{id}` | Verified: the recipient received the money |
 | Simulate a declined charge | `PayPal-Mock-Response` test header (sandbox only) | on order creation | Written but **not tested** |
 
-**Evidence from sandbox runs** (all sandbox test data, no real money):
+**Evidence from sandbox runs** (October 22, 2026; test money only):
 
-- A saved wallet was charged $5.00: order `5VW6472472262700B`, completed. The
-  recipient's receipt shows transaction `58N29882VB551984P`, reason "Billing Agreement",
-  a $0.66 fee, and a net of $4.34.
-- Live circle, round 1: all six members' saved wallets were charged $5.00 each, the
-  pot was $30.00, and payout batch `NUS2T5FM5Q8G2` was sent to the winner, whose
-  activity then showed transaction `27F14062VN813640C`, note "Tanda round 1", $30.00.
-- An earlier test payout, batch `XDNCQQANB5P8G` ($5.00), also arrived in the recipient's account.
+- Six completed contributions of 5.00 USD each appear in the Business activity.
+- The saved-wallet receipt shown below has transaction ID `195576195X540760B`,
+  billing agreement `B-5KW02379SL281252F`, 5.00 USD gross, a 0.66 USD fee and 4.34 USD net.
+- The winner's screenshot confirms 30.00 USD received, with note "Tanda round 1"
+  and recipient transaction ID `8GF45973MY936960D`.
+- Older chat notes contain other order, batch and transaction IDs. They are not
+  assumed to be the same transactions as these screenshots, and are omitted here
+  to avoid an unverified mapping.
 
 **Design choices around the money**
 
-- A person approves every round before anything is charged or paid out.
-- Orders carry a unique `PayPal-Request-Id`, and each payout batch has a unique
-  `sender_batch_id`, so a retry cannot double-charge or double-pay.
-- A PayPal error is turned into a plain message that includes PayPal's `debug_id`. In
-  the circle, a refused charge from a member who was already paid becomes a 0 in
-  that member's history.
-- Everything runs in the sandbox, and the hosted demo makes no PayPal calls.
+- A person reviews and approves live sandbox rounds. The AI tool list excludes execution.
+- Live mode requires all member wallets and payout emails before it can start.
+- A private local journal records each operation before a payment request and saves
+  returned order and batch IDs. Successful contributions are reused when the same
+  circle resumes, rather than recreated. Intent identifiers stay stable for that operation.
+- Confirmed completed captures count toward the gross pot. A pending/failed payout
+  does not mark the winner paid or advance the round. Pending batches are checked again.
+- A lost response blocks uncertain writes; it is not blindly retried. The read-only
+  recovery script can attach an existing matching order/batch after manual lookup.
+- Authentication/service errors do not lower a member's reliability. Only confirmed
+  payment declines are counted as missed payments, and only post-payout histories update.
+- The hosted demo makes no PayPal calls. Keep `ENABLE_LIVE` unset on public hosting.
 
-**Not done or not verified:** rounds 2 to 6 have not been run live, the declined-charge
-test header is untested, and sandbox fees mean the money collected in a round is slightly
-less than the sum of the contributions. Using saved wallets in production would likely
-need extra PayPal approval, which I have not checked.
+**Fees and the prefunded sandbox balance.** The six contributions total 30.00 USD
+gross. At the 0.66 USD fee shown on each receipt, net collections total 26.04 USD.
+The outgoing 30.00 USD payout also carries a 0.25 USD sandbox fee. The existing
+Business test balance covers the 4.21 USD difference. This prototype pays the gross
+pot; it does not solve fee funding for production circles.
+
+**Verification scope.** The screenshots document a historical successful sandbox
+round. The new journal, failure handling and recovery logic are covered by automated
+tests using fake PayPal responses; they have not yet been revalidated against PayPal's
+sandbox. Rounds 2–6 and the sandbox mock-decline header remain unverified against PayPal.
+Permanently failed payouts require investigation; the app does not automatically send a replacement.
 
 **Tools used:** PayPal REST APIs (Orders, Vault, Payouts) in the sandbox; Google
 Gemini API for the coordinator; Render for hosting; Streamlit for the page; Python with
@@ -192,7 +188,7 @@ fee and 4.34 USD net.
 
 ## Agent safety design
 
-An AI model will coordinate the circle, but it cannot move money. `tanda_tools.py`
+A Gemini AI model coordinates the circle, but it cannot move money. `tanda_tools.py`
 gives it four tools: look at the circle's status, estimate one member, score the
 payout orders, and propose the next round. A proposal moves nothing. Running a round
 is a separate function (`approve_and_run`) that a human triggers and that is not in
@@ -213,7 +209,7 @@ answer, and a request for a tool outside the safe list is refused and shown as
 
 ## Results so far (one simulated circle, seed 42)
 
-Six simulated members, 8 months of history each. Model-estimated numbers:
+Six simulated members, 8 months of history each, **100 USD contributions per member per round**. Model-estimated numbers (the app defaults to 5 USD, so its dollar estimates are twenty times smaller):
 
 | Order | Expected loss | Chance of 3+ missed payments |
 |---|---|---|
@@ -221,8 +217,7 @@ Six simulated members, 8 months of history each. Model-estimated numbers:
 | Random order (average over all 720) | $426 | 80.9% |
 | Worst | $590 | 95.6% |
 
-This is a single run, scored with the model's own beliefs. A multi-run validation
-against the true probabilities is planned (see Roadmap).
+This is a single run, scored with the model's own beliefs. The multi-run validation study against known true probabilities is reported below.
 
 Playing that circle out with `tanda_round.py` (dry run, seed 42, $100 contributions),
 the payout order held for all six rounds and 4 payments were missed after payout
@@ -233,7 +228,7 @@ A member who missed payments after being paid (Femi) saw his estimate fall from
 
 Live sandbox check (round 1): the circle ran with six saved sandbox wallets. All six
 members were charged $5.00 through PayPal, the pot was $30.00, and a payout was sent
-to the winner (batch status PENDING at the time). I stopped after round 1; rounds
+to the winner (the recipient screenshot below now confirms receipt). I stopped after round 1; rounds
 2 to 6 have not been run live.
 
 ## Validation study (`python tanda_study.py`, seed 2026)
@@ -329,7 +324,7 @@ Findings:
 - **The hosted demo is a dry run.** It shows the statistics, the approval flow, and the AI
   coordinator, but makes no PayPal calls, so a stranger cannot trigger sandbox payments
   from this account. The live PayPal runs (charges, payouts) are documented in this README
-  and shown in the demo video. The free Render plan also goes to sleep when idle.
+  and illustrated by the sandbox screenshots above. The free Render plan also goes to sleep when idle.
 - **AI model names change.** Google renames and retires Gemini models often, so the
   model is a setting (`GEMINI_MODEL`) rather than a promise. On Google's free tier,
   questions and answers may be used to improve its products, which is acceptable here
@@ -339,11 +334,16 @@ Findings:
   underlying table and the tools it used.
 - **Live runs are lightly tested.** Round 1 of a live run is verified; the
   `--mock-decline` option (asking the sandbox to simulate a declined charge) is untested.
-- **Real accounts always pay.** Each member has a real sandbox account with a saved
-  wallet, but the sandbox always approves the charge, so real members never miss a
-  payment on their own. Their payment histories (the track record the statistics
-  use) are still simulated, and a missed payment can only be shown with simulated
-  members or the untested `--mock-decline` option.
+- **Sandbox approval is not guaranteed.** The recorded successful charges do not
+  establish how failures behave in real use. Payment histories are simulated and
+  the sandbox mock-decline header is still unverified against PayPal.
+- **Local recovery only.** Live journals are local files protected against concurrent
+  processes on the same machine. They are not a distributed payment ledger. Do not
+  delete journals or choose a new circle ID to retry an uncertain round; doing so
+  discards the record needed to prevent repeated payments. Live mode is for a single
+  local operator, not public hosting or production money.
+- **Payment state is conservative.** Unknown outcomes and permanently failed payouts
+  stop progress for investigation. There is no automatic compensation/refund system.
 
 ## Run it
 
@@ -365,15 +365,52 @@ Findings:
    private window while logged in as that exact sandbox Personal account). Wallets
    are saved to `members.local.json`, which is git-ignored. `python
    vault_charge_test.py` charges one saved wallet.
-5. Whole circle: `python tanda_round.py` (dry run, no PayPal calls; add `--yes` to
-   skip the approval prompts), then `python tanda_round.py --live` (real sandbox
-   calls; the member Ana becomes real if `TEST_VAULT_ID` and `PAYPAL_TEST_RECEIVER`
-   are set). Use a small `--contribution` for live runs.
+5. Whole circle: `python tanda_round.py` is a dry run (no PayPal calls). `--yes`
+   is accepted only for dry runs. For live sandbox mode, save all six wallets, then run:
+   ```text
+   python tanda_round.py --live --contribution 5 --circle-id rehearsal-01
+   ```
+   Review and approve round 1 with `y`; stop before round 2 with `n` if recording only
+   one round. Keep the same circle ID, seed and contribution to resume after interruption.
+   A new ID intentionally starts a separate circle and may charge again.
+   Keep `.tanda-local/` private and intact; it contains recovery state but no API keys.
+   The sandbox Business balance must cover fees on top of the gross pot.
 6. Validation study: `python tanda_study.py` (under a minute on my machine;
    `--quick` for a rougher, faster version).
 7. Web page: `pip install -r requirements.txt`, then
    `python -m streamlit run app.py`. It starts as a dry run (no PayPal calls).
    Click Propose next round, then approve it as the human.
+   The default is a dry run. For a local live sandbox page only, set `ENABLE_LIVE=1`,
+   choose Live PayPal sandbox, enter a circle ID and start/resume the circle. All six
+   wallets must be configured. Leave live mode disabled on Render.
+8. Offline regression checks (after installing requirements):
+   ```text
+   python -m unittest discover -s tests -v
+   ```
+   These use fake responses, not PayPal credentials or money. To reproduce the app's
+   core statistics without AI or PayPal, the dry-run commands above are sufficient.
+
+### Recovering an uncertain sandbox request
+
+1. Stop and keep the same journal, circle ID and original settings. Do not rerun the
+   standalone payment helpers as a workaround; those create separate test payments.
+2. If an order ID was saved, approving again reads that existing order. A confirmed
+   capture can be recognized even if its earlier response was lost. Pending batches
+   are also read again without creating another payout.
+3. If an order-creation response was lost before its ID could be saved, find the
+   existing order in PayPal's developer logs, then reconcile it with:
+   ```text
+   python tanda_recover.py --circle-id rehearsal-01 --round 1 --member Ana --order-id ORDER_ID
+   ```
+4. For a lost payout-creation response, find the existing batch and use:
+   ```text
+   python tanda_recover.py --circle-id rehearsal-01 --round 1 --payout-batch-id BATCH_ID
+   ```
+   Add the original `--seed` and `--contribution` if nondefault. The script makes only
+   read-only PayPal calls, validates the operation reference, and never sends money.
+   An unresolvable unknown outcome or permanently failed payout remains blocked;
+   investigate it in PayPal rather than deleting the journal or changing circle ID.
+
 
 
 
@@ -388,9 +425,11 @@ Done in this submission
  - Agent tool layer (read-only and propose-only tools) and a Gemini AI coordinator
  - Streamlit page, hosted on Render (dry run only)
  - Finer probability grid (199 values) to remove the 0.95 ceiling
+ - Local sandbox operation journal and regression tests for payment failures and recovery
 
 Still to do before submitting
 
+ - Revalidate the revised live runner with one small sandbox round
  - Demo video (the link goes at the top of this README once it is uploaded)
 
 Future work (not part of submission)
@@ -401,8 +440,9 @@ Future work (not part of submission)
 
 ## Notes
 
-- Built with help from AI for coding and explanations. I
-  reviewed the code and can explain it.
+- Claude was used for coding assistance and explanations during initial development.
+  Codex assisted with review, payment-state fixes, tests and submission preparation.
+  Google Gemini is the AI service integrated into the running application.
 - Created after the hackathon began (Oct 10, 2026). The early Buy Button test was
   setup practice, not part of the project.
 

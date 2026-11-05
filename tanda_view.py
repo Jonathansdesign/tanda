@@ -44,8 +44,8 @@ def status_rows(status):
             "Member": m["name"],
             "Paid out yet?": "yes" if m["already_paid"] else "no",
             "Months of history": m["months_of_history"],
-            "Predicted on-time": m["predicted_on_time"],
-            "90% interval": f"{lo:.2f} to {hi:.2f}",
+            "Predicted on-time": f"{m['predicted_on_time']:.1%}",
+            "90% interval": f"{lo:.0%}–{hi:.0%}",
             "Watch": "watch" if m["needs_attention"] else "",
             "Account": "saved wallet" if m["has_paypal_wallet"] else "simulated",
         })
@@ -87,7 +87,7 @@ def proposal_lines(p):
         f"(pot of up to ${p['maximum_pot']:.2f}).",
     ]
     if real:
-        lines.append("Real PayPal sandbox wallet(s) will be charged: " + ", ".join(real) + ".")
+        lines.append("PayPal sandbox wallets in this round: " + ", ".join(real) + ".")
     else:
-        lines.append("No real PayPal wallets are involved, so this round is fully simulated.")
+        lines.append("No PayPal wallets are involved, so this round is fully simulated.")
     return lines

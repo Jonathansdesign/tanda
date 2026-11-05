@@ -38,12 +38,15 @@ def start_new_circle():
             live=live,
             contribution=float(st.session_state["contribution"]),
             seed=int(st.session_state["seed"]),
+            circle_id=st.session_state.get("sandbox_circle_id"),
         )
         st.session_state["flash"] = None
     except Exception as e:                      # for example, missing PayPal keys
         st.session_state["flash"] = f"Could not start that circle: {e}"
+        st.session_state.pop("session", None)
     st.session_state["last_round"] = None
     st.session_state["agent_result"] = None
+    st.session_state["round_details"] = []
 
 
 def do_propose():
@@ -62,6 +65,7 @@ def do_approve():
     result = session.approve_and_run(session.pending["proposal_id"])
     st.session_state["flash"] = result.get("error")
     st.session_state["last_round"] = None if "error" in result else result
+    st.session_state["round_details"] = result.get("details", []) if "error" in result else []
     st.session_state["agent_result"] = None      # an old answer would now be out of date
 
 
@@ -80,6 +84,9 @@ def ask_coordinator(question=None):
 st.sidebar.header("Circle settings")
 if LIVE_ALLOWED:
     st.sidebar.radio("Mode", ["Dry run", LIVE_LABEL], key="mode")
+    st.sidebar.text_input("Sandbox circle ID", key="sandbox_circle_id",
+                          help="Choose a unique ID once. Reuse it and the original settings to resume.")
+    st.sidebar.caption("Live mode requires all six saved wallets. Keep the local journal when resuming.")
 else:
     st.session_state["mode"] = "Dry run"
     st.sidebar.caption("Mode: dry run. Live PayPal calls are switched off on this server.")
@@ -97,11 +104,17 @@ if "coordinator" not in st.session_state:       # one per visitor; keeps its own
 
 # --------------------------------------------------------------------- page
 st.title("Tanda")
+st.write("Six members contribute each round, and one receives the pot. "
+         "Explore how payout order changes estimated risk.")
+st.markdown("[GitHub & setup](https://github.com/Jonathansdesign/tanda) · "
+            "[PayPal evidence](https://github.com/Jonathansdesign/tanda#paypal-sandbox-screenshots)")
 st.caption("A savings-circle risk engine built on PayPal's sandbox. Members' payment "
            "histories are simulated and no real money moves.")
 
 if st.session_state.get("flash"):
     st.error(st.session_state["flash"])
+    if st.session_state.get("round_details"):
+        st.code("\n".join(st.session_state["round_details"]))
 if "session" not in st.session_state:
     st.stop()                                   # nothing to show if startup failed
 
@@ -126,12 +139,17 @@ else:
 table = pd.DataFrame(status_rows(status)).set_index("Member")
 st.dataframe(table)
 st.caption("Predicted chance each member pays on time")
-st.bar_chart(table[["Predicted on-time"]])
+chart = pd.DataFrame({"Member": [m["name"] for m in status["members"]],
+                      "Predicted on-time (%)": [100 * m["predicted_on_time"]
+                                                for m in status["members"]]}).set_index("Member")
+st.bar_chart(chart)
 
 if not status["circle_complete"]:
     # 2. The statistics' recommendation
     score = call_tool(session, "score_orders")
-    st.subheader("Safest payout order")
+    st.subheader("Lowest estimated loss under this model")
+    st.caption("This recommendation considers payment risk. Organizers may also consider "
+               "urgency, fairness, and community agreements.")
     st.write(order_text(score["best_order"]))
     col1, col2 = st.columns(2)
     col1.metric("Expected loss (this order)", f"${score['expected_loss']:.2f}")
@@ -149,7 +167,9 @@ if not status["circle_complete"]:
         st.write(f"**Proposal {pending['proposal_id']}**")
         for line in proposal_lines(pending):
             st.write(md(line))
-        st.warning("Nothing has happened yet. A person has to approve this.")
+        st.warning("A person must approve this round. In live mode, approving again after an "
+                   "interruption checks existing payments; unresolved outcomes block progress."
+                   if session.live else "Nothing has happened yet. A person has to approve this.")
         b1, b2 = st.columns(2)
         b1.button("I approve: run this round", on_click=do_approve)
         b2.button("Cancel", on_click=do_cancel)

@@ -30,7 +30,8 @@ class TandaSession:
     """Holds one circle's state: the members, who has been paid, and the current round."""
 
     def __init__(self, members, contribution=5.0, live=False, client=None,
-                 rng=None, bad_threshold=3, mock_decline=False):
+                 rng=None, bad_threshold=3, mock_decline=False, circle_id=None,
+                 journal_dir=None):
         self.members = members
         self.contribution = contribution
         self.live = live
@@ -43,6 +44,12 @@ class TandaSession:
         self.ledger = []          # one record per finished round
         self.pending = None       # the proposal waiting for a human, if any
         self._proposal_count = 0
+        self.live_journal = None
+        if live:
+            from tanda_payments import LiveCircle
+            self.live_journal = LiveCircle(members, contribution, circle_id, client, journal_dir)
+            self.paid_out, self.ledger = self.live_journal.restore()
+            self.rnd = len(self.ledger)
 
     # ------------------------------------------------------------------
     # Helpers (not tools)
@@ -126,6 +133,8 @@ class TandaSession:
         """Prepare the next round for a HUMAN to approve. Moves no money."""
         if self.complete:
             return {"error": "the circle is complete; no more rounds to propose"}
+        if self.pending is not None:
+            return dict(self.pending)
         plan = plan_round(self.members, self.paid_out, self.rnd,
                           self.contribution, self.bad_threshold)
         best = plan["best"]
@@ -160,9 +169,15 @@ class TandaSession:
                              f"('{self.pending['proposal_id']}')"}
         lines = []
         winner = self._find(self.pending["winner"])
-        record = execute_round(self.members, self.paid_out, self.rnd, self.contribution,
-                               winner, self.live, self.client, self.rng,
-                               self.mock_decline, say=lines.append)
+        try:
+            record = execute_round(self.members, self.paid_out, self.rnd, self.contribution,
+                                   winner, self.live, self.client, self.rng,
+                                   self.mock_decline, say=lines.append,
+                                   live_journal=self.live_journal)
+        except Exception as exc:
+            # Keep the proposal and round. In live mode the journal preserves intents,
+            # so approval after an interruption cannot recreate completed payments.
+            return {"error": f"Round unresolved: {exc}", "details": lines}
         record["details"] = lines
         self.ledger.append(record)
         self.rnd += 1
@@ -170,8 +185,8 @@ class TandaSession:
         return record
 
 
-def new_demo_session(live=False, contribution=5.0, seed=42):
-    """Start a fresh demo circle (six simulated members; Ana is real if configured).
+def new_demo_session(live=False, contribution=5.0, seed=42, circle_id=None):
+    """Start a dry-run demo, or resume a complete set of sandbox wallets by circle ID.
 
     live=False: a dry run, no PayPal calls. live=True: real sandbox calls.
     """
@@ -181,7 +196,7 @@ def new_demo_session(live=False, contribution=5.0, seed=42):
         from paypal_client import PayPalClient   # only needed (and only loaded) in live mode
         client = PayPalClient()
     return TandaSession(members, contribution=contribution, live=live, client=client,
-                        rng=random.Random(seed + 1))
+                        rng=random.Random(seed + 1), circle_id=circle_id)
 
 
 # ----------------------------------------------------------------------
