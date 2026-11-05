@@ -10,6 +10,19 @@ Built for the PayPal AI Hackathon (Oct 2026). Everything uses PayPal's **sandbox
 no real money moves, and all member payment histories used for the statistics are
 **simulated**.
 
+## Judge quick start
+
+| Entry point | What is functional | What to expect |
+|---|---|---|
+| [Hosted Render demo](https://tanda-wma5.onrender.com/) | Statistics, Gemini coordinator, proposal and human approval | Payment rounds are simulated; no PayPal calls |
+| Local terminal, `tanda_round.py --live` | PayPal sandbox contributions and payout, human approval, local recovery journal | Uses the reviewer's own sandbox accounts and test money |
+| [Local reproduction guide](docs/LOCAL_SETUP.md) | Fresh-clone setup, no-key dry run, optional Gemini, all six sandbox wallets | No developer's private keys or wallet file is required |
+
+**November 5 evidence:** [six completed contributions](docs/06-six-contributions-Nov05.png),
+[the same payout batch from PENDING to SUCCESS](docs/04-terminal-recovery-Nov05.png),
+and [the winner's matching 30 USD receipt](docs/05-winner-receipt-Nov05.png).
+The two outgoing 30 USD activity rows are batch/item views, not two separate pots.
+
 ## Live demo
 
 **https://tanda-wma5.onrender.com/**
@@ -155,17 +168,45 @@ The outgoing 30.00 USD payout also carries a 0.25 USD sandbox fee. The existing
 Business test balance covers the 4.21 USD difference. This prototype pays the gross
 pot; it does not solve fee funding for production circles.
 
-**Verification scope.** The screenshots document a historical successful sandbox
-round. The new journal, failure handling and recovery logic are covered by automated
-tests using fake PayPal responses; they have not yet been revalidated against PayPal's
-sandbox. Rounds 2–6 and the sandbox mock-decline header remain unverified against PayPal.
-Permanently failed payouts require investigation; the app does not automatically send a replacement.
+**Verification scope.** On November 5, 2026, the revised local runner collected
+six 5 USD sandbox contributions. Payout batch `G2U9A7H3QHFGL` first returned
+`PENDING`, so the winner was not marked paid and the runner stopped. Resuming the
+same `video-rehearsal-01` circle checked the saved operations and that same batch,
+then confirmed `SUCCESS`. Ana's recipient receipt is transaction
+`4PC2308575449973A`, 30 USD, note "Tanda round 1". Round 2 was declined by the
+operator before execution. The terminal and matching receipts are linked below.
+Automated tests cover additional failure and recovery cases using fake responses.
+Rounds 2–6 and the PayPal mock-decline header remain unverified against the sandbox.
+Permanently failed payouts require investigation; no replacement is sent automatically.
 
 **Tools used:** PayPal REST APIs (Orders, Vault, Payouts) in the sandbox; Google
 Gemini API for the coordinator; Render for hosting; Streamlit for the page; Python with
 `requests`.
 
 ### PayPal sandbox screenshots
+
+All images use PayPal sandbox test money.
+
+**November 5 — six contributions:** six completed 5 USD incoming payments and the
+completed outgoing payout are visible in the Business account's activity.
+
+![November 5 six completed sandbox contributions](docs/06-six-contributions-Nov05.png)
+
+**November 5 — pending payout recovery:** the same batch `G2U9A7H3QHFGL` changes
+from PENDING to SUCCESS on resume. Round 2 is stopped before execution. The repeated
+"paid" lines on resume report the existing contributions, not additional charges.
+
+![November 5 terminal pending and success output](docs/04-terminal-recovery-Nov05.png)
+
+**November 5 — recipient confirmation:** Ana receives 30 USD with note "Tanda round 1",
+transaction `4PC2308575449973A`.
+
+![November 5 matching winner receipt](docs/05-winner-receipt-Nov05.png)
+
+#### Earlier evidence — October 22
+
+The images below document an earlier run, separate from the November 5 rehearsal.
+
 
 All transactions below use sandbox test money.
 
@@ -347,48 +388,25 @@ Findings:
 
 ## Run it
 
-1. Install a recent Python 3, then run `pip install -r requirements.txt`.
-2. Copy `.env.example` to `.env` and fill in your sandbox credentials
-   (Developer Dashboard, Apps & Credentials, Sandbox tab, Default Application):
-   ```
-   PAYPAL_CLIENT_ID=
-   PAYPAL_CLIENT_SECRET=
-   PAYPAL_TEST_RECEIVER=   # a sandbox Personal account email
-   TEST_VAULT_ID=          # printed by vault_test.py
-   ENABLE_LIVE=            # set to 1 to allow live PayPal calls from the web page
-   GEMINI_API_KEY=         # free key from Google AI Studio (enables the AI coordinator)
-   GEMINI_MODEL=           # optional; Google renames models often
-   ```
-3. Statistics (no PayPal needed): `python tanda_stats.py` and `python tanda_loss.py`
-4. PayPal sandbox: `python create_order.py`, `python create_payout.py`, then save
-   each member's wallet once with `python vault_test.py NAME EMAIL` (approve in a
-   private window while logged in as that exact sandbox Personal account). Wallets
-   are saved to `members.local.json`, which is git-ignored. `python
-   vault_charge_test.py` charges one saved wallet.
-5. Whole circle: `python tanda_round.py` is a dry run (no PayPal calls). `--yes`
-   is accepted only for dry runs. For live sandbox mode, save all six wallets, then run:
-   ```text
-   python tanda_round.py --live --contribution 5 --circle-id rehearsal-01
-   ```
-   Review and approve round 1 with `y`; stop before round 2 with `n` if recording only
-   one round. Keep the same circle ID, seed and contribution to resume after interruption.
-   A new ID intentionally starts a separate circle and may charge again.
-   Keep `.tanda-local/` private and intact; it contains recovery state but no API keys.
-   The sandbox Business balance must cover fees on top of the gross pot.
-6. Validation study: `python tanda_study.py` (under a minute on my machine;
-   `--quick` for a rougher, faster version).
-7. Web page: `pip install -r requirements.txt`, then
-   `python -m streamlit run app.py`. It starts as a dry run (no PayPal calls).
-   Click Propose next round, then approve it as the human.
-   The default is a dry run. For a local live sandbox page only, set `ENABLE_LIVE=1`,
-   choose Live PayPal sandbox, enter a circle ID and start/resume the circle. All six
-   wallets must be configured. Leave live mode disabled on Render.
-8. Offline regression checks (after installing requirements):
-   ```text
-   python -m unittest discover -s tests -v
-   ```
-   These use fake responses, not PayPal credentials or money. To reproduce the app's
-   core statistics without AI or PayPal, the dry-run commands above are sufficient.
+Follow [the complete local reproduction guide](docs/LOCAL_SETUP.md). It includes
+fresh-clone commands for Windows, macOS and Linux; expected results; optional Gemini
+setup; all six sandbox wallet enrollments; and the one-round PayPal reproduction.
+The fresh-clone dry-run path was checked on Python 3.12.14 without any private
+credential or wallet files. The optional sandbox path is supported by the November 5
+rehearsal evidence above, not a fresh run with a second merchant's accounts.
+
+Quick commands after installing `requirements.txt` in your environment:
+
+```text
+python -m streamlit run app.py
+python tanda_round.py --yes --contribution 5 --seed 42
+python -m unittest discover -s tests -v
+```
+
+These commands do not make PayPal calls. Gemini is optional locally; the statistics
+and simulated rounds work without API keys. For actual PayPal sandbox calls, first
+complete all six wallet setups, then use `--live` with a unique circle ID as described
+in the guide. Keep `ENABLE_LIVE` unset on public hosting.
 
 ### Recovering an uncertain sandbox request
 
@@ -426,10 +444,10 @@ Done in this submission
  - Streamlit page, hosted on Render (dry run only)
  - Finer probability grid (199 values) to remove the 0.95 ceiling
  - Local sandbox operation journal and regression tests for payment failures and recovery
+ - Revised runner verified through round 1 and pending-payout recovery (November 5)
 
 Still to do before submitting
 
- - Revalidate the revised live runner with one small sandbox round
  - Demo video (the link goes at the top of this README once it is uploaded)
 
 Future work (not part of submission)
