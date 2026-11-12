@@ -1,7 +1,6 @@
 # Tanda
 
-Savings circles run on trust and spreadsheets, so Tanda estimates each member's
-reliability, compares payout orders and recommends one based on estimated payment risk through PayPal's sandbox. An AI coordinator (Google Gemini)
+Savings circles run on trust and spreadsheets, so Tanda estimates member reliability from payment histories and recommends a payout order based on estimated risk. The local runner collects contributions and sends payouts through PayPal’s sandbox. An AI coordinator (Google Gemini)
 explains the circle in plain language and can propose the next round, but only a person
 can approve it. (Prototype: tested on simulated circles.)
 
