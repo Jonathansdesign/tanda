@@ -322,7 +322,7 @@ Findings:
 - **Fees.** The sandbox simulated a $0.66 fee on a $5.00 charge, so money collected
   in a round is slightly less than the sum of contributions.
 
-## Limitations (honest)
+## Limitations
 
 - **Simulated data.** There is no real circle data. Histories are generated from
   known probabilities, so results show how the method behaves, not how real people behave.
@@ -414,32 +414,6 @@ in the guide. Keep `ENABLE_LIVE` unset on public hosting.
    An unresolvable unknown outcome or permanently failed payout remains blocked;
    investigate it in PayPal rather than deleting the journal or changing circle ID.
 
-
-
-
-# Roadmap
-
-Done in this submission
-
- - Statistics: Bayesian reliability estimates and risk scoring of all payout orders
- - Validation study on simulated circles (interval coverage, loss versus baselines)
- - PayPal sandbox: saved wallets, charging them with nobody present, payouts
- - Round runner with a human approval step
- - Agent tool layer (read-only and propose-only tools) and a Gemini AI coordinator
- - Streamlit page, hosted on Render (dry run only)
- - Finer probability grid (199 values) to remove the 0.95 ceiling
- - Local sandbox operation journal and regression tests for payment failures and recovery
- - Revised runner verified through round 1 and pending-payout recovery (November 5)
-
-Still to do before submitting
-
- - Demo video (the link goes at the top of this README once it is uploaded)
-
-Future work (not part of submission)
-
-- Exact continuous (Beta) posterior, once covered in class, to check the grid against the exact answer
-- Sensitivity check: compare against a model where every payment updates beliefs
-- Try the tool with real circle organizers (with their consent) and real payment histories
 
 ## Notes
 
