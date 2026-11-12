@@ -1,8 +1,7 @@
 # Tanda
 
 Savings circles run on trust and spreadsheets, so Tanda estimates each member's
-reliability, recommends the payout order with the least expected loss, and moves
-contributions and payouts through PayPal's sandbox. An AI coordinator (Google Gemini)
+reliability, compares payout orders and recommends one based on estimated payment risk through PayPal's sandbox. An AI coordinator (Google Gemini)
 explains the circle in plain language and can propose the next round, but only a person
 can approve it. (Prototype: tested on simulated circles.)
 
@@ -30,7 +29,7 @@ The two outgoing 30 USD activity rows are batch/item views, not two separate pot
 Hosted on Render's free plan, so the first visit after a quiet period can take about a
 minute to wake up. The hosted page runs as a **dry run**: it makes no PayPal calls (see
 Limitations). The PayPal sandbox flow is documented under "Results so far" below and
-illustrated by the sandbox screenshots below. A recorded walkthrough will be linked here once uploaded.
+illustrated by the sandbox screenshots below.
 
 To try it:
 
@@ -38,7 +37,7 @@ To try it:
 2. Click **Propose next round**, then **I approve: run this round**. Only that button
    runs a round.
 3. Repeat, or ask the **AI coordinator** a question (for example "Who needs attention?").
-   It explains the numbers and can propose a round, but it cannot approve one.
+   It explains the numbers and can propose a round, but it can't approve one.
 
 ## The idea in plain English
 
@@ -71,23 +70,6 @@ those priorities. Its assumption that missed payments arise after payout also ne
 checking against real practice. I have not tested Tanda with real organizers or real
 payment histories. The next step is voluntary feedback on the assumptions and explanations.
 
-## Status
-
-| Piece | File(s) | Status |
-|---|---|---|
-| Estimate each member's on-time probability (Bayes) | `tanda_stats.py` | Built, runs on simulated data |
-| Score all payout orders, pick the least risky | `tanda_loss.py` | Built, runs on simulated data |
-| PayPal client (token reuse, errors, orders, payouts, vault) | `paypal_client.py` | Built, tested against the sandbox |
-| Create a sandbox order | `create_order.py` | Works |
-| Send a sandbox payout | `create_payout.py` | Works (payout arrives in the buyer account) |
-| Save a member's PayPal wallet (approve once) | `vault_test.py`, `tanda_members.py` | Works; all six members have saved wallets |
-| Charge a saved wallet with no one present | `vault_charge_test.py` | Works |
-| Run a whole circle round by round, with human approval | `tanda_round.py` | Built. Dry run verified; live round 1 verified with six sandbox accounts |
-| Agent tool layer (what an AI is allowed to see and propose) | `tanda_tools.py` | Model-independent tool layer; integrated with Gemini |
-| AI coordinator (Gemini reads the circle through the tools and explains it) | `tanda_agent.py` | Built; answered a question with a real Gemini key |
-| Web page (Streamlit): status, safest order, propose then human approves | `app.py`, `tanda_view.py` | Built; runs locally, dry-run flow verified |
-| Hosted demo (Render, free plan, dry run) | | Deployed: https://tanda-wma5.onrender.com/ |
-| Simulation study (validates the model against known truth) | `tanda_study.py` | Built and run |
 
 ## How it works
 
@@ -102,7 +84,7 @@ payment histories. The next step is voluntary feedback on the assumptions and ex
    saved PayPal wallet, and the round's pot is sent to the winner with the Payouts
    API. Only a confirmed payment decline can become a 0 in a post-payout member's history; technical or uncertain outcomes stop the round without changing reliability.
 4. **Run the circle** (`tanda_round.py`). Each round: plan, ask a human to approve,
-   collect contributions, record who missed, send the pot. Dry runs simulate all payments. Live sandbox mode requires a saved wallet and payout email for every member; simulated contributions cannot fund a PayPal payout.
+   collect contributions, record who missed, send the pot. Dry runs simulate all payments. Live sandbox mode requires a saved wallet and payout email for every member; simulated contributions can't fund a PayPal payout.
 
 ### Model assumptions
 
@@ -212,26 +194,11 @@ documents a separate test, not the November 5 rehearsal shown above.
 ![Earlier sandbox test October 22 saved-wallet payment linked to a billing agreement](docs/03-saved-wallet-charge.png)
 
 
-## Agent safety design
+## AI Coordinator
 
-A Gemini AI model coordinates the circle, but it cannot move money. `tanda_tools.py`
-gives it four tools: look at the circle's status, estimate one member, score the
-payout orders, and propose the next round. A proposal moves nothing. Running a round
-is a separate function (`approve_and_run`) that a human triggers and that is not in
-the list of tools the AI can call; a request for it by name is refused. All numbers
-come from the Python statistics, not from the model, and the model is never shown
-the simulated members' hidden true probabilities.
+Google Gemini uses four tools to read circle status, inspect member reliability estimates, compare payout orders, and propose the next round. Python calculates the statistics; Gemini explains the results. The interface displays the tools used for each response.
 
-## AI tool used
-
-Google's Gemini API (the `generateContent` endpoint, called with plain `requests`).
-It acts as a coordinator: given a question, it asks for one or more of four safe tools
-(circle status, one member's estimate, payout-order scoring, propose the next round),
-reads the results our Python code produced, and explains them in plain language.
-It does no math, never sees the simulated members' hidden true probabilities, cannot
-approve a round, and cannot move money. The page shows which tools it used for each
-answer, and a request for a tool outside the safe list is refused and shown as
-"(refused)". Each visitor gets 15 questions and the server 300, to protect the free quota.
+Running a round requires separate human approval. Payment execution is excluded from Gemini’s available tools, so the AI can't approve rounds or send payments.
 
 ## Results so far (one simulated circle, seed 42)
 
@@ -305,7 +272,7 @@ Findings:
   circles compared) over the naive ranking, because shrinkage stops a member with
   2 perfect payments from outranking one with 15 out of 16.
 - The remaining value of the Bayesian approach is the uncertainty: credible
-  intervals and the probability of a bad outcome, which a plain ranking cannot give.
+  intervals and the probability of a bad outcome, which a plain ranking can't give.
 
 ## What went wrong along the way
 
@@ -342,20 +309,20 @@ Findings:
   numbers, not a surprising order.
 - **The payout order never changes mid-circle.** Members already paid are fixed,
   and (by the model's own assumption) unpaid members' estimates never update, so
-  re-planning each round cannot change who goes next. In 60 simulated circles the
+  re-planning each round can't change who goes next. In 60 simulated circles the
   plan never changed. The per-round learning still updates risk estimates for
   members who have already been paid, which flags who needs follow-up, but it does
   not reorder anyone. Loosening the assumption (letting every payment update
   beliefs) is a planned sensitivity check.
 - **The hosted demo is a dry run.** It shows the statistics, the approval flow, and the AI
-  coordinator, but makes no PayPal calls, so a stranger cannot trigger sandbox payments
+  coordinator, but makes no PayPal calls, so a stranger can't trigger sandbox payments
   from this account. The live PayPal runs (charges, payouts) are documented in this README
   and illustrated by the sandbox screenshots above. The free Render plan also goes to sleep when idle.
 - **AI model names change.** Google renames and retires Gemini models often, so the
   model is a setting (`GEMINI_MODEL`) rather than a promise. On Google's free tier,
   questions and answers may be used to improve its products, which is acceptable here
   only because every member and payment history is simulated.
-- **The AI is only as good as its tools.** It can explain the numbers but cannot check
+- **The AI is only as good as its tools.** It can explain the numbers but can't check
   them, and a language model can still phrase things imprecisely, so the page shows the
   underlying table and the tools it used.
 - **Live runs are lightly tested.** Round 1 of a live run is verified; the
